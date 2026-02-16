@@ -44,8 +44,23 @@ def handle_issues(results, max_attempts=2):
                         text=True
                     )
                     log(f"Remediation output: {completed.stdout.strip()}")
-                    success = True
-                    break  # Exit retry loop if successful
+
+                    # ✅ For services: check if service is now active
+                    if r["check"] == "service":
+                        service_name = r["resource"]
+                        status = subprocess.getoutput(f"systemctl is-active {service_name}").strip()
+                        log(f"Service {service_name} status after remediation: {status}")
+                        if status == "active":
+                            success = True
+                            break
+                        else:
+                            log(f"Service {service_name} still {status}")
+                            time.sleep(2)
+                    else:
+                        # For other checks, assume remediation worked if command didn't error
+                        success = True
+                        break
+
                 except subprocess.CalledProcessError as e:
                     log(f"Remediation failed on attempt {attempt}: {e.stderr.strip()}")
                     time.sleep(2)
