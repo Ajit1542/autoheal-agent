@@ -1,66 +1,65 @@
-import time
 import subprocess
-
-def run_remediation_command(cmd):
-    try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-    except Exception as e:
-        return False, "", str(e)
-
+import time
+from core.logger import log
 
 def handle_issues(results, max_attempts=2):
+    """
+    Attempt remediation for ALERTs that are retryable
+    Logs every attempt and outcome
+    """
     final_results = []
 
     for r in results:
-
-        # Only process ALERTs
         if r.get("status") != "ALERT":
             final_results.append(r)
             continue
 
-        # Skip non-retryable
         if not r.get("retryable", False):
+            log(f"Skipping non-retryable ALERT: {r['check']} - {r.get('message')}")
             final_results.append(r)
             continue
 
-        # AI decision placeholder
         if r.get("remediation") == "AI_DECIDE":
             r["note"] = "Remediation deferred to AI decision engine"
+            log(f"ALERT {r['check']} deferred to AI decision")
             final_results.append(r)
             continue
 
-        cmd = r.get("remediation")
-
-        if not cmd:
-            final_results.append(r)
-            continue
-
+        remediation_cmd = r.get("remediation")
         success = False
 
         for attempt in range(1, max_attempts + 1):
             r["note"] = f"Attempt {attempt} remediation"
+            log(f"Attempt {attempt} remediation for {r['check']}: {remediation_cmd}")
 
-            ok, out, err = run_remediation_command(cmd)
-
-            r["last_output"] = out.strip()
-            r["last_error"] = err.strip()
-
-            if ok:
-                r["status"] = "RESOLVED"
-                r["note"] = f"Remediation succeeded on attempt {attempt}"
-                success = True
+            if remediation_cmd:
+                try:
+                    # Run the bash remediation
+                    completed = subprocess.run(
+                        remediation_cmd,
+                        shell=True,
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    log(f"Remediation output: {completed.stdout.strip()}")
+                    success = True
+                    break  # Exit retry loop if successful
+                except subprocess.CalledProcessError as e:
+                    log(f"Remediation failed on attempt {attempt}: {e.stderr.strip()}")
+                    time.sleep(2)
+            else:
+                log(f"No remediation command provided for {r['check']}")
                 break
 
-            time.sleep(2)
-
-        if not success:
+        if success:
+            r["status"] = "RESOLVED"
+            r["note"] += " - Remediation successful"
+            log(f"ALERT {r['check']} resolved successfully")
+        else:
             r["status"] = "FAILED"
+            log(f"ALERT {r['check']} remediation failed after {max_attempts} attempts")
 
         final_results.append(r)
 

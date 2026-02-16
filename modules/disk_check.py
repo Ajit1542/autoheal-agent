@@ -1,69 +1,52 @@
 import psutil
 import subprocess
-
-EXCLUDE_FS = ["tmpfs", "devtmpfs", "proc", "sysfs", "overlay"]
+from core.logger import log
 
 def run(threshold):
     results = []
 
-    # -------- 1️⃣ Check Disk Usage --------
+    # Disk usage check
     for partition in psutil.disk_partitions():
-        if any(fs in partition.fstype.lower() for fs in EXCLUDE_FS):
-            continue
-
         try:
             usage = psutil.disk_usage(partition.mountpoint)
             percent = usage.percent
+            log(f"Disk {partition.mountpoint} usage checked: {percent}%")
 
             if percent > threshold:
-                results.append({
+                alert = {
                     "check": "disk",
                     "status": "ALERT",
                     "severity": "HIGH",
                     "message": f"High disk usage on {partition.mountpoint}: {percent}%",
                     "remediation": None,
                     "resource": partition.mountpoint,
-                    "retryable": False,
-                    "value": percent
-                })
+                    "retryable": False
+                }
+                log(f"Disk ALERT triggered: {alert['message']}")
+                results.append(alert)
             else:
                 results.append({
                     "check": "disk",
                     "status": "OK",
-                    "severity": "INFO",
-                    "message": f"{partition.mountpoint} usage normal: {percent}%",
-                    "resource": partition.mountpoint,
-                    "value": percent
+                    "message": f"{partition.mountpoint} usage normal: {percent}%"
                 })
-
         except Exception as e:
-            results.append({
-                "check": "disk",
-                "status": "ALERT",
-                "severity": "LOW",
-                "message": f"Disk check failed on {partition.mountpoint}: {str(e)}",
-                "resource": partition.mountpoint,
-                "retryable": False
-            })
+            log(f"Disk check failed for {partition.mountpoint}: {e}", level="ERROR")
+            continue
 
-    # -------- 2️⃣ Check df hang --------
+    # df hang check
     try:
-        subprocess.run(
-            ["df", "-h"],
-            timeout=5,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        subprocess.run(["df", "-h"], timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        results.append({
+        alert = {
             "check": "df_hang",
             "status": "ALERT",
             "severity": "CRITICAL",
             "message": "df command hanging - possible stale mount",
             "remediation": None,
-            "resource": "global",
-            "retryable": False,
-            "value": "timeout"
-        })
+            "retryable": False
+        }
+        log(f"Disk ALERT triggered: {alert['message']}")
+        results.append(alert)
 
     return results

@@ -1,28 +1,25 @@
 import logging
 import os
-import sys
 
-# Ensure logs directory exists
+# Ensure logs folder exists
 os.makedirs("logs", exist_ok=True)
 
-# Configure logging
 logging.basicConfig(
     filename="logs/agent.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# Console logging optional
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-logging.getLogger().addHandler(console_handler)
-
 def log(msg, level="INFO"):
-    """Log a message to file (and console)"""
-    if level.upper() == "ERROR":
+    if level.upper() == "INFO":
+        logging.info(msg)
+        print(f"[INFO] {msg}")
+    elif level.upper() == "ERROR":
         logging.error(msg)
+        print(f"[ERROR] {msg}")
     elif level.upper() == "WARNING":
         logging.warning(msg)
+        print(f"[WARN] {msg}")
     else:
-        logging.info(msg)
+        logging.debug(msg)
+        print(f"[DEBUG] {msg}")

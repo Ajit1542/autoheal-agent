@@ -6,6 +6,9 @@ thresholds:
 services:
   - sssd
   - chronyd
+  - httpd
+  - mysqld
+  - sshd
 server:
   name: prod-01
 

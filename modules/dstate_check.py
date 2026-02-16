@@ -1,56 +1,27 @@
 import subprocess
+from core.logger import log
 
 def run():
     try:
-        result = subprocess.run(
-            ["ps", "-eo", "stat"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        output = subprocess.getoutput("ps -eo stat | grep '^D' | wc -l")
+        count = int(output.strip())
+        log(f"D-state process count: {count}")
 
-        lines = result.stdout.strip().split("\n")
-
-        # Count lines starting with 'D'
-        dstate_count = sum(1 for line in lines if line.startswith("D"))
-
-        if dstate_count > 0:
-            return [{
+        if count > 0:
+            alert = {
                 "check": "dstate",
                 "status": "ALERT",
                 "severity": "CRITICAL",
-                "message": f"{dstate_count} processes in D-state (possible I/O issue)",
+                "message": f"{count} processes in D-state (possible I/O issue)",
                 "remediation": None,
                 "resource": "system",
-                "retryable": False,
-                "value": dstate_count
-            }]
-        else:
-            return [{
-                "check": "dstate",
-                "status": "OK",
-                "severity": "INFO",
-                "message": "No D-state processes detected",
-                "resource": "system",
-                "value": 0
-            }]
+                "retryable": False
+            }
+            log(f"D-state ALERT triggered: {alert['message']}")
+            return [alert]
 
-    except subprocess.TimeoutExpired:
-        return [{
-            "check": "dstate",
-            "status": "ALERT",
-            "severity": "CRITICAL",
-            "message": "ps command timed out while checking D-state",
-            "resource": "system",
-            "retryable": False
-        }]
+        return [{"check": "dstate", "status": "OK", "message": "No D-state processes detected"}]
 
     except Exception as e:
-        return [{
-            "check": "dstate",
-            "status": "ALERT",
-            "severity": "LOW",
-            "message": f"D-state check failed: {str(e)}",
-            "resource": "system",
-            "retryable": False
-        }]
+        log(f"D-state check failed: {e}", level="ERROR")
+        return [{"check": "dstate", "status": "ERROR", "message": str(e)}]

@@ -1,58 +1,31 @@
 import subprocess
+from core.logger import log
 
 def run(services):
     results = []
 
     for svc in services:
-        try:
-            result = subprocess.run(
-                ["systemctl", "is-active", svc],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+        cmd = f"systemctl is-active {svc}"
+        status = subprocess.getoutput(cmd).strip()
+        log(f"Service check for {svc}: {status}")
 
-            status_output = result.stdout.strip()
-
-            if result.returncode != 0 or status_output != "active":
-                results.append({
-                    "check": "service",
-                    "status": "ALERT",
-                    "severity": "HIGH",
-                    "message": f"{svc} is DOWN",
-                    "remediation": f"bash/restart_service.sh {svc}",
-                    "resource": svc,
-                    "retryable": True,
-                    "value": status_output
-                })
-            else:
-                results.append({
-                    "check": "service",
-                    "status": "OK",
-                    "severity": "INFO",
-                    "message": f"{svc} running",
-                    "resource": svc,
-                    "value": status_output
-                })
-
-        except subprocess.TimeoutExpired:
-            results.append({
+        if status != "active":
+            alert = {
                 "check": "service",
                 "status": "ALERT",
-                "severity": "CRITICAL",
-                "message": f"{svc} check timed out",
+                "severity": "HIGH",
+                "message": f"{svc} is DOWN",
+                "remediation": f"bash/restart_service.sh {svc}",
                 "resource": svc,
-                "retryable": False
-            })
-
-        except Exception as e:
+                "retryable": True
+            }
+            log(f"Service ALERT triggered: {alert['message']}")
+            results.append(alert)
+        else:
             results.append({
                 "check": "service",
-                "status": "ALERT",
-                "severity": "CRITICAL",
-                "message": f"{svc} check failed: {str(e)}",
-                "resource": svc,
-                "retryable": False
+                "status": "OK",
+                "message": f"{svc} running"
             })
 
     return results

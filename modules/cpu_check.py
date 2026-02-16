@@ -1,36 +1,25 @@
 import psutil
+from core.logger import log
 
 def run(threshold):
-    try:
-        cpu = psutil.cpu_percent(interval=1)
+    cpu = psutil.cpu_percent(interval=1)
+    log(f"CPU usage checked: {cpu}%")
 
-        if cpu > threshold:
-            return {
-                "check": "cpu",
-                "status": "ALERT",
-                "severity": "HIGH",
-                "message": f"High CPU usage: {cpu}%",
-                "remediation": None,
-                "resource": "global",
-                "retryable": False,
-                "value": cpu
-            }
-
-        return {
-            "check": "cpu",
-            "status": "OK",
-            "severity": "INFO",
-            "message": f"CPU normal: {cpu}%",
-            "resource": "global",
-            "value": cpu
-        }
-
-    except Exception as e:
-        return {
+    if cpu > threshold:
+        alert = {
             "check": "cpu",
             "status": "ALERT",
-            "severity": "CRITICAL",
-            "message": f"CPU check failed: {str(e)}",
+            "severity": "HIGH",
+            "message": f"High CPU usage: {cpu}%",
+            "remediation": None,
             "resource": "global",
             "retryable": False
         }
+        log(f"CPU ALERT triggered: {alert['message']}")
+        return alert
+
+    return {
+        "check": "cpu",
+        "status": "OK",
+        "message": f"CPU normal: {cpu}%"
+    }
