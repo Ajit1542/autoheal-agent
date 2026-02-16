@@ -46,7 +46,7 @@ def process_incidents(results, server="local"):
     log(f"Processing incidents for {len(results)} results")
 
     for r in results:
-        if r.get("status") != "ALERT":
+        if r.get("status") not in ["ALERT","FAILED"]:
             final_results.append(r)
             continue
 
