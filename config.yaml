@@ -6,6 +6,8 @@ thresholds:
 services:
   - sssd
   - chronyd
+server:
+  name: prod-01
 
 retry:
   max_attempts: 2

@@ -1,21 +1,36 @@
 import psutil
 
 def run(threshold):
-    cpu = psutil.cpu_percent(interval=1)
+    try:
+        cpu = psutil.cpu_percent(interval=1)
 
-    if cpu > threshold:
+        if cpu > threshold:
+            return {
+                "check": "cpu",
+                "status": "ALERT",
+                "severity": "HIGH",
+                "message": f"High CPU usage: {cpu}%",
+                "remediation": None,
+                "resource": "global",
+                "retryable": False,
+                "value": cpu
+            }
+
+        return {
+            "check": "cpu",
+            "status": "OK",
+            "severity": "INFO",
+            "message": f"CPU normal: {cpu}%",
+            "resource": "global",
+            "value": cpu
+        }
+
+    except Exception as e:
         return {
             "check": "cpu",
             "status": "ALERT",
-            "severity": "HIGH",
-            "message": f"High CPU usage: {cpu}%",
-            "remediation": None,
+            "severity": "CRITICAL",
+            "message": f"CPU check failed: {str(e)}",
             "resource": "global",
             "retryable": False
         }
-
-    return {
-        "check": "cpu",
-        "status": "OK",
-        "message": f"CPU normal: {cpu}%"
-    }
