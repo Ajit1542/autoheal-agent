@@ -17,6 +17,7 @@ def run(threshold):
                     "severity": "HIGH",
                     "message": f"High disk usage on {partition.mountpoint}: {percent}%",
                     "remediation": None,
+                    "resource": partition.mountpoint,
                     "retryable": False
                 })
             else:

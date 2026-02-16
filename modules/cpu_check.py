@@ -10,6 +10,7 @@ def run(threshold):
             "severity": "HIGH",
             "message": f"High CPU usage: {cpu}%",
             "remediation": None,
+            "resource": "global",
             "retryable": False
         }
 

@@ -14,6 +14,7 @@ def run(services):
                 "severity": "HIGH",
                 "message": f"{svc} is DOWN",
                 "remediation": f"bash/restart_service.sh {svc}",
+                "resource": svc,
                 "retryable": True
             })
         else:

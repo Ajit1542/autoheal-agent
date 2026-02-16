@@ -15,6 +15,7 @@ def run():
                 "severity": "CRITICAL",
                 "message": f"{count} processes in D-state (possible I/O issue)",
                 "remediation": None,
+                "resource": "system",
                 "retryable": False
             }]
         else:

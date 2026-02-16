@@ -10,6 +10,7 @@ def run(threshold):
             "severity": "HIGH",
             "message": f"High memory usage: {mem}%",
             "remediation": None,
+            "resource": "memory",
             "retryable": False
         }
 
