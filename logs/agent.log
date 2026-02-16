@@ -1,0 +1,4 @@
+2026-02-16 12:48:09,147 - INFO - High memory usage: 89.4%
+2026-02-16 12:48:09,147 - INFO - nginx is DOWN
+2026-02-16 12:48:09,147 - INFO - sssd is DOWN
+2026-02-16 12:48:09,147 - INFO - docker is DOWN

@@ -1,0 +1,11 @@
+thresholds:
+  cpu: 85
+  memory: 85
+  disk: 90
+
+services:
+  - sssd
+  - chronyd
+
+retry:
+  max_attempts: 2
