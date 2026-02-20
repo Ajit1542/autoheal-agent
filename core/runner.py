@@ -1,31 +1,57 @@
-from modules import cpu_check, memory_check, service_check, disk_check, dstate_check, mount_check
-from core.logger import log
+# core/runner.py
 
-def safe_run(check_func, *args):
+from core.logger import log
+from monitors import (
+    cpu_monitor,
+    memory_monitor,
+    service_monitor,
+    disk_monitor,
+    mount_monitor,
+    stale_mount_monitor
+)
+
+# Central monitor registry
+MONITORS = [
+    cpu_monitor,
+    memory_monitor,
+    service_monitor,
+    disk_monitor,
+    mount_monitor,
+    stale_mount_monitor,
+]
+
+
+def safe_run(monitor, config):
     try:
-        result = check_func(*args)
-        if not isinstance(result, list):
-            result = [result]
-        return result
+        results = monitor.run(config)
+
+        if not isinstance(results, list):
+            results = [results]
+
+        return results
+
     except Exception as e:
-        log(f"Check {check_func.__module__} failed: {e}", level="ERROR")
+        log(f"Monitor {monitor.__name__} failed: {e}", level="ERROR")
+
         return [{
-            "check": check_func.__module__,
-            "status": "ERROR",
-            "severity": "LOW",
-            "message": f"Check execution failed: {str(e)}",
+            "check": monitor.__name__,
             "resource": "system",
-            "retryable": False
+            "status": "ALERT",
+            "message": f"Monitor execution failed: {str(e)}",
+            "retryable": False,
+            "remediation": None
         }]
+
 
 def run_all_checks(config):
     log("Running all health checks")
-    results = []
-    results.extend(safe_run(cpu_check.run, config["thresholds"]["cpu"]))
-    results.extend(safe_run(memory_check.run, config["thresholds"]["memory"]))
-    results.extend(safe_run(service_check.run, config["services"]))
-    results.extend(safe_run(disk_check.run, config["thresholds"]["disk"]))
-    results.extend(safe_run(dstate_check.run))
-    results.extend(safe_run(mount_check.run))
-    log(f"Checks completed. Total results: {len(results)}")
-    return results
+
+    all_results = []
+
+    for monitor in MONITORS:
+        results = safe_run(monitor, config)
+        all_results.extend(results)
+
+    log(f"Checks completed. Total results: {len(all_results)}")
+
+    return all_results

@@ -2,80 +2,65 @@ import subprocess
 import time
 from core.logger import log
 
-def handle_issues(results, max_attempts=2):
+def execute(results, max_attempts=2):
     """
-    Attempt remediation for ALERTs that are retryable
-    Logs every attempt and outcome
+    Execute remediation based on decision.
     """
+
     final_results = []
 
     for r in results:
-        if r.get("status") != "ALERT":
+
+        if r.get("decision") != "AUTO_REMEDIATE":
             final_results.append(r)
             continue
 
-        if not r.get("retryable", False):
-            log(f"Skipping non-retryable ALERT: {r['check']} - {r.get('message')}")
-            final_results.append(r)
-            continue
-
-        if r.get("remediation") == "AI_DECIDE":
-            r["note"] = "Remediation deferred to AI decision engine"
-            log(f"ALERT {r['check']} deferred to AI decision")
-            final_results.append(r)
-            continue
-
-        remediation_cmd = r.get("remediation")
+        remediation = r.get("remediation")
         success = False
 
         for attempt in range(1, max_attempts + 1):
-            r["note"] = f"Attempt {attempt} remediation"
-            log(f"Attempt {attempt} remediation for {r['check']}: {remediation_cmd}")
+            log(f"Remediation attempt {attempt} for {r['resource']}")
 
-            if remediation_cmd:
+            if remediation and remediation["type"] == "restart_service":
+
+                service_name = remediation["target"]
+                cmd = f"bash/restart_service.sh {service_name}"
+
                 try:
-                    # Run the bash remediation
-                    completed = subprocess.run(
-                        remediation_cmd,
+                    subprocess.run(
+                        cmd,
                         shell=True,
                         check=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True
                     )
-                    log(f"Remediation output: {completed.stdout.strip()}")
 
-                    # ✅ For services: check if service is now active
-                    if r["check"] == "service":
-                        service_name = r["resource"]
-                        status = subprocess.getoutput(f"systemctl is-active {service_name}").strip()
-                        log(f"Service {service_name} status after remediation: {status}")
-                        if status == "active":
-                            success = True
-                            break
-                        else:
-                            log(f"Service {service_name} still {status}")
-                            time.sleep(2)
-                    else:
-                        # For other checks, assume remediation worked if command didn't error
+                    status = subprocess.getoutput(
+                        f"systemctl is-active {service_name}"
+                    ).strip()
+
+                    if status == "active":
                         success = True
                         break
 
-                except subprocess.CalledProcessError as e:
-                    log(f"Remediation failed on attempt {attempt}: {e.stderr.strip()}")
                     time.sleep(2)
-            else:
-                log(f"No remediation command provided for {r['check']}")
-                break
+
+                except subprocess.CalledProcessError as e:
+                    log(f"Remediation failed: {e.stderr.strip()}")
+                    time.sleep(2)
 
         if success:
             r["status"] = "RESOLVED"
-            r["note"] += " - Remediation successful"
-            log(f"ALERT {r['check']} resolved successfully")
+            log(f"{r['resource']} resolved successfully")
         else:
             r["status"] = "FAILED"
-            log(f"ALERT {r['check']} remediation failed after {max_attempts} attempts")
+            log(f"{r['resource']} remediation failed")
 
         final_results.append(r)
 
     return final_results
+
+# The execute function is responsible for performing remediation actions based on the decisions made in the decision engine. It iterates through the results, checks if the decision is "AUTO_REMEDIATE", and if so, it attempts to execute the specified remediation action (e.g., restarting a service) up to a maximum number of attempts. The function uses subprocess to run shell commands and checks the status of the service after each attempt. If the remediation is successful, it updates the status to "RESOLVED"; otherwise, it marks it as "FAILED". This allows the agent to automatically attempt to fix issues and track the outcome of those attempts effectively.
+# The logic in this function ensures that we are making a concerted effort to resolve issues automatically while also providing feedback on the success or failure of those attempts, which can be crucial for improving system reliability and reducing the need for manual intervention.
+#  

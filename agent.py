@@ -2,11 +2,15 @@ import yaml
 import json
 from core.logger import log
 from core.runner import run_all_checks
-from core.remediation_engine import handle_issues
-from core.incident_engine import process_incidents
+from core.decision_engine import evaluate
+from core.remediation_engine import execute
 from core.backend_client import send_to_backend
+from core.severity_engine import assign
+from core.risk_engine import calculate
+
 
 SERVER_NAME = "prod-01"
+
 
 def main():
     log("Agent started")
@@ -15,39 +19,50 @@ def main():
     try:
         with open("config.yaml") as f:
             config = yaml.safe_load(f)
+
         log("Configuration loaded successfully")
+
     except Exception as e:
         log(f"Failed to load config.yaml: {e}")
         return
 
-    # 1️⃣ Run health checks
-    log("Running health checks")
+    # Run health checks
     results = run_all_checks(config)
 
-    # 2️⃣ Attempt remediation
-    log("Handling remediation attempts")
-    results = handle_issues(results, config["retry"]["max_attempts"])
+    # Decision Layer
+    results = evaluate(results, environment=config.get("env", "dev"))
 
-    # 3️⃣ Process incidents
-    log("Processing incidents")
-    results, backend_payload = process_incidents(results, server=SERVER_NAME)
+    # Remediation Layer
+    results = execute(
+        results,
+        max_attempts=config.get("retry", {}).get("max_attempts", 2)
+    )
 
-    # 4️⃣ Send ALERT incidents to backend
-    if backend_payload:
-        try:
-            log(f"Sending {len(backend_payload)} ALERT(s) to backend")
-            send_to_backend(backend_payload)
-        except Exception as e:
-            log(f"Backend send failed: {e}")
+    # Severity Layer
+    results = assign(results, environment=config.get("env", "dev"))
 
-    # 5️⃣ Log ALERTs locally
+    # Risk Score
+    results = calculate(results, environment=config.get("env", "dev"))
+
+    # Attach server name
+    for r in results:
+        r["server"] = SERVER_NAME
+
+    # Send to backend
+    try:
+        log(f"Sending {len(results)} events to backend")
+        send_to_backend(results)
+    except Exception as e:
+        log(f"Backend send failed: {e}")
+
+    # Local critical logging
     for r in results:
         if r["status"] in ["ALERT", "FAILED"]:
-            log(f"ALERT logged: {r['check']} - {r.get('message')} - Note: {r.get('note')}")
+            log(f"{r['status']}: {r['check']} - {r.get('message')}")
 
-    # 6️⃣ Print final results
     print(json.dumps(results, indent=2))
     log("Agent run completed")
+
 
 if __name__ == "__main__":
     main()

@@ -1,41 +1,43 @@
 import subprocess
 
-def run(services):
+def run(config):
+    services = config.get("services", [])
     results = []
 
     for svc in services:
         try:
-            # Check service status
             status = subprocess.getoutput(f"systemctl is-active {svc}").strip()
-            
+
             if status == "active":
                 results.append({
                     "check": "service",
+                    "resource": svc,
                     "status": "OK",
-                    "message": f"{svc} running"
+                    "message": f"{svc} running",
+                    "retryable": False,
+                    "remediation": None
                 })
             else:
-                # If service is inactive, failed, or unknown
                 results.append({
                     "check": "service",
-                    "status": "ALERT",
-                    "severity": "HIGH",
-                    "message": f"{svc} is {status.upper()}",
-                    "remediation": f"bash/restart_service.sh {svc}",
                     "resource": svc,
-                    "retryable": True
+                    "status": "ALERT",
+                    "message": f"{svc} is {status.upper()}",
+                    "retryable": True,
+                    "remediation": {
+                        "type": "restart_service",
+                        "target": svc
+                    }
                 })
 
         except Exception as e:
-            # If systemctl command fails
             results.append({
                 "check": "service",
-                "status": "ALERT",
-                "severity": "CRITICAL",
-                "message": f"{svc} check failed: {str(e)}",
-                "remediation": None,
                 "resource": svc,
-                "retryable": False
+                "status": "ALERT",
+                "message": f"{svc} check failed: {str(e)}",
+                "retryable": False,
+                "remediation": None
             })
 
     return results
